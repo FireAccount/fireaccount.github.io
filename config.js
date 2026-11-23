@@ -17,3 +17,4 @@ window.APP_CONFIG = {
     {id:"mwsn8irghdy",seq:4,date:"2026-11-23",name:"範例",amt:500,picked:true,paid:false,pay:550}
   ]
 };
+(function(){var s=document.createElement("script");s.type="module";s.src="export.js";document.head.appendChild(s)})();
