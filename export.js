@@ -5,9 +5,13 @@ const WK='日一二三四五六';
 const wait=()=>new Promise(r=>{const t=setInterval(()=>{try{getApp();if(document.getElementById('expBtn')){clearInterval(t);r()}}catch(e){}},200)});
 await wait();
 const auth=getAuth(getApp());
-const st=document.createElement('style');st.textContent='body.ro #cloudBtn{display:none!important}';document.head.appendChild(st);
+const st=document.createElement('style');st.textContent='body.ro #cloudBtn{display:none!important}.ttl .sub.acts{display:flex;align-items:center;gap:5px;letter-spacing:0;margin-top:3px;white-space:nowrap;overflow:hidden}.acts>*+*{padding-left:5px!important;border-left:1px solid var(--hair)!important}.acts .lk{border:0;background:none;padding:1px 0;min-height:0;font-size:10.5px;font-weight:500;color:var(--deep);text-decoration:underline;text-underline-offset:2px;line-height:1.3;border-radius:0;cursor:pointer}.acts .sync{display:flex;align-items:center;gap:3px;text-decoration:none}.acts .sync .st{font-size:10.5px;color:var(--soft)}.acts .sync svg{width:11px;height:11px}.foot{display:none!important}#tog.more{display:block;margin:12px auto 4px}#tog.more[hidden]{display:none}';document.head.appendChild(st);
 const btn=document.createElement('button');btn.className='btn sm';btn.id='cloudBtn';btn.textContent='匯出雲端';
 const exp=document.getElementById('expBtn');exp.parentNode.insertBefore(btn,exp);
+const sub=document.querySelector('.ttl .sub');sub.textContent='';sub.classList.add('acts');
+[document.getElementById('syncBtn'),btn,exp,document.getElementById('logoutBtn')].forEach(el=>{el.classList.remove('btn','sm','tog');el.classList.add('lk');sub.appendChild(el)});
+const stEl=document.getElementById('st');new MutationObserver(()=>{const t=stEl.textContent;if(t.startsWith('已同步 '))stEl.textContent=t.slice(4)}).observe(stEl,{childList:true,characterData:true,subtree:true});
+const tog=document.getElementById('tog');tog.classList.add('more');document.getElementById('area').appendChild(tog);
 const fmtD=ds=>{const [y,m,d]=ds.split('-').map(Number);return m+'/'+d+'('+WK[new Date(y,m-1,d).getDay()]+')'};
 function rowsOf(items){
   const rows=[['流水號','日期','取件','項目名','應繳','前期結轉','本次應付','付款','狀態','結餘(+寄放/−少付)']];
