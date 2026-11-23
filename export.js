@@ -18,9 +18,9 @@ const sub=document.querySelector('.ttl .sub');sub.textContent='';sub.classList.a
 const stEl=document.getElementById('st');new MutationObserver(()=>{const t=stEl.textContent;if(t.startsWith('已同步 '))stEl.textContent=t.slice(4)}).observe(stEl,{childList:true,characterData:true,subtree:true});
 const tog=document.getElementById('tog');tog.classList.add('more');document.getElementById('area').appendChild(tog);
 const fmtD=ds=>{const [y,m,d]=ds.split('-').map(Number);return m+'/'+d+'('+WK[new Date(y,m-1,d).getDay()]+')'};
+const HEAD=['流水號','日期','取件','項目名','應繳','前期結轉','本次應付','付款','狀態','結餘(+寄放/−少付)','key'];
 function rowsOf(items){
-  const rows=[['流水號','日期','取件','項目名','應繳','前期結轉','本次應付','付款','狀態','結餘(+寄放/−少付)']];
-  let carry=0,from=null;
+  const out=[];let carry=0,from=null;
   [...items].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.seq||0)-(b.seq||0))).forEach(it=>{
     const amt=Number(it.amt)||0,need=amt-carry;
     const unpaid=!it.paid&&(it.pay===null||it.pay===undefined||it.pay==='');
@@ -28,10 +28,11 @@ function rowsOf(items){
     const bal=unpaid?carry-amt:pay-need;
     const ct=carry>0?fmtD(from)+'寄放 扣'+carry:carry<0?fmtD(from)+'少付 補'+(-carry):'';
     const s=unpaid?'待收':bal<0?'少付':bal>0?'寄放':'結清';
-    rows.push(['#'+String(it.seq||0).padStart(4,'0'),fmtD(it.date),it.picked?'已取':'未取',it.name,amt,ct,need,unpaid?'':pay,s,bal]);
+    const key=it.date+'|'+String(it.seq||0).padStart(6,'0')+'|'+it.id;
+    out.push({id:it.id,key,del:false,vals:['#'+String(it.seq||0).padStart(4,'0'),fmtD(it.date),it.picked?'已取':'未取',it.name,amt,ct,need,unpaid?'':pay,s,bal,key]});
     carry=bal;from=it.date;
   });
-  return rows;
+  return out;
 }
 btn.onclick=async()=>{
   const u=auth.currentUser;if(!u||!window.FB)return;
@@ -42,13 +43,26 @@ btn.onclick=async()=>{
     const tok=GoogleAuthProvider.credentialFromResult(res).accessToken;
     btn.textContent='匯出中…';
     const {items}=await window.FB.getData();
-    const rows=rowsOf(items);
+    const cur=rowsOf(items);const ids=new Set(cur.map(r=>r.id));
     const H={Authorization:'Bearer '+tok,'Content-Type':'application/json'};
-    const base='https://sheets.googleapis.com/v4/spreadsheets/'+SHEET+'/values/';
-    let r=await fetch(base+encodeURIComponent('A:Z')+':clear',{method:'POST',headers:H,body:'{}'});
+    const api='https://sheets.googleapis.com/v4/spreadsheets/'+SHEET;
+    let r=await fetch(api+'/values/'+encodeURIComponent('A2:K'),{headers:H});
+    if(!r.ok)throw new Error('read '+r.status);
+    const old=((await r.json()).values)||[];
+    old.forEach(v=>{const k=v[10];if(!k)return;const id=k.split('|').slice(2).join('|');if(ids.has(id))return;ids.add(id);
+      const vals=v.slice(0,11);while(vals.length<11)vals.push('');cur.push({id,key:k,del:true,vals})});
+    cur.sort((a,b)=>a.key.localeCompare(b.key));
+    r=await fetch(api+'/values/'+encodeURIComponent('A:Z')+':clear',{method:'POST',headers:H,body:'{}'});
     if(!r.ok)throw new Error('clear '+r.status);
-    r=await fetch(base+'A1?valueInputOption=RAW',{method:'PUT',headers:H,body:JSON.stringify({values:rows})});
+    r=await fetch(api+'/values/A1?valueInputOption=RAW',{method:'PUT',headers:H,body:JSON.stringify({values:[HEAD].concat(cur.map(x=>x.vals))})});
     if(!r.ok)throw new Error('update '+r.status);
+    r=await fetch(api+'?fields=sheets.properties.sheetId',{headers:H});
+    const sid=(await r.json()).sheets[0].properties.sheetId;
+    const reqs=[{repeatCell:{range:{sheetId:sid,startRowIndex:1,endRowIndex:cur.length+50},cell:{userEnteredFormat:{textFormat:{strikethrough:false,foregroundColor:{red:0,green:0,blue:0}}}},fields:'userEnteredFormat.textFormat.strikethrough,userEnteredFormat.textFormat.foregroundColor'}},
+      {updateDimensionProperties:{range:{sheetId:sid,dimension:'COLUMNS',startIndex:10,endIndex:11},properties:{hiddenByUser:true},fields:'hiddenByUser'}}];
+    cur.forEach((x,i)=>{if(x.del)reqs.push({repeatCell:{range:{sheetId:sid,startRowIndex:i+1,endRowIndex:i+2,startColumnIndex:0,endColumnIndex:10},cell:{userEnteredFormat:{textFormat:{strikethrough:true,foregroundColor:{red:0.6,green:0.6,blue:0.6}}}},fields:'userEnteredFormat.textFormat.strikethrough,userEnteredFormat.textFormat.foregroundColor'}})});
+    r=await fetch(api+':batchUpdate',{method:'POST',headers:H,body:JSON.stringify({requests:reqs})});
+    if(!r.ok)throw new Error('format '+r.status);
     btn.textContent='已匯出 ✓';
   }catch(e){console.error(e);btn.textContent=e&&e.code==='auth/popup-closed-by-user'?'已取消':'匯出失敗'}
   btn.disabled=false;setTimeout(()=>{btn.textContent='匯出雲端'},2500);
