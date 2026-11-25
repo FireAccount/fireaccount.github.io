@@ -74,6 +74,9 @@ btn.onclick=async()=>{
     r=await fetch(api+':batchUpdate',{method:'POST',headers:H,body:JSON.stringify({requests:reqs})});
     if(!r.ok)throw new Error('format '+r.status);
     btn.textContent='已匯出 ✓';
+    const FOLDER_URL='https://drive.google.com/drive/folders/133dQOTK4Y8v-JhucX19NZ7BjdvGi4FpW';
+    const w=window.open(FOLDER_URL,'_blank');
+    if(!w){const to=document.getElementById('toast'),tt=document.getElementById('toastTxt'),un=document.getElementById('undo');tt.innerHTML='已匯出 · <a href="'+FOLDER_URL+'" target="_blank" rel="noopener" style="color:#f1e3b5;font-weight:700">打開雲端資料夾 ›</a>';un.hidden=true;to.hidden=false;setTimeout(()=>{to.hidden=true},8000)}
   }catch(e){console.error(e);btn.textContent=e&&e.code==='auth/popup-closed-by-user'?'已取消':'匯出失敗'}
   btn.disabled=false;setTimeout(()=>{btn.textContent='匯出雲端'},2500);
 };
