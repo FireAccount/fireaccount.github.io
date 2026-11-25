@@ -1,5 +1,6 @@
 import {getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,GoogleAuthProvider,reauthenticateWithPopup} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,getDoc,deleteDoc,setDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const SHEET='1wDI36tQb0EjhaLLhNueCmI0lASRBX_BbQ1J0zX1gwkk';
 const WK='日一二三四五六';
 const wait=()=>new Promise(r=>{const t=setInterval(()=>{try{getApp();if(document.getElementById('expBtn')){clearInterval(t);r()}}catch(e){}},200)});
@@ -9,6 +10,15 @@ auth.authStateReady().then(()=>setTimeout(()=>document.documentElement.classList
 const flushDel=()=>{const t=document.getElementById('toast'),u=document.getElementById('undo');if(t&&!t.hidden&&u&&!u.hidden)document.getElementById('syncBtn').click()};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushDel()});
 window.addEventListener('pagehide',flushDel);
+const db=getFirestore(getApp());const COL=(window.APP_CONFIG&&window.APP_CONFIG.collection)||'fwItems';
+let lastDel=null,delP=null;
+const showMsg=t=>{const to=document.getElementById('toast'),tt=document.getElementById('toastTxt'),un=document.getElementById('undo');if(!to)return;tt.textContent=t;un.hidden=true;to.hidden=false;setTimeout(()=>{to.hidden=true},5000)};
+document.getElementById('grid').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act="del"]');if(!b||document.body.classList.contains('ro'))return;
+  const card=b.closest('.card');if(!card)return;const id=card.dataset.id;const ref=doc(db,COL,id);
+  delP=(async()=>{try{const s=await getDoc(ref);lastDel=s.exists()?{id,data:s.data()}:null;await deleteDoc(ref)}catch(err){console.error(err);lastDel=null;showMsg('刪除失敗：'+(err.code||err.message))}})();
+},true);
+document.getElementById('undo').addEventListener('click',async()=>{if(delP)await delP;if(!lastDel)return;const x=lastDel;lastDel=null;try{await setDoc(doc(db,COL,x.id),x.data)}catch(err){showMsg('復原失敗：'+(err.code||err.message))}},true);
 const st=document.createElement('style');st.textContent='body.ro #cloudBtn{display:none!important}.ttl .sub.acts{display:flex;align-items:center;gap:5px;letter-spacing:0;margin-top:3px;white-space:nowrap;overflow:hidden}.acts>*+*{padding-left:5px!important;border-left:1px solid var(--hair)!important}.acts .lk{border:0;background:none;padding:1px 0;min-height:0;font-size:10.5px;font-weight:500;color:var(--deep);text-decoration:underline;text-underline-offset:2px;line-height:1.3;border-radius:0;cursor:pointer}.acts .sync{display:flex;align-items:center;gap:3px;text-decoration:none}.acts .sync .st{font-size:10.5px;color:var(--soft)}.acts .sync svg{width:11px;height:11px}.foot{display:none!important}#tog.more{display:block;margin:12px auto 4px}#tog.more[hidden]{display:none}';document.head.appendChild(st);
 const btn=document.createElement('button');btn.className='btn sm';btn.id='cloudBtn';btn.textContent='匯出雲端';
 const exp=document.getElementById('expBtn');exp.parentNode.insertBefore(btn,exp);
